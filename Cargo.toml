@@ -1,0 +1,9 @@
+[package]
+name = "wallet"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+time = "0.1.12"
+regex = "0.1.41"
+bdk = "0.25.0"
