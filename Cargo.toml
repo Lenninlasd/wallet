@@ -7,3 +7,5 @@ edition = "2021"
 time = "0.1.12"
 regex = "0.1.41"
 bdk = "0.25.0"
+rocket = {version = "0.5.0-rc.2", features = ["json"]}
+serde = "1.0.152"
