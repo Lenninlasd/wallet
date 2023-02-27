@@ -12,11 +12,11 @@ use bdk::{
     wallet::AddressIndex,
     blockchain::{
         ElectrumBlockchain,
-        // Blockchain,
+        Blockchain,
     },
     electrum_client::Client,
     SyncOptions,
-    // SignOptions,
+    SignOptions,
     TransactionDetails,
 };
 
@@ -66,14 +66,23 @@ fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status
         .add_recipient(faucet_address.script_pubkey(), withdraw.amount)
         .enable_rbf();
         
-    // let (mut psbt, tx_details) = tx_builder.finish().unwrap();
-    let (_, tx_details) = tx_builder.finish().unwrap();
+    let (mut psbt, tx_details) = tx_builder.finish().unwrap();
     
     println!("Transaction details: {:#?}", tx_details);
 
-    // let finalized = wallet.sign(&mut psbt, SignOptions::default()).unwrap();
-    // assert!(finalized, "Tx has not been finalized");
-    // println!("Transaction Signed: {}", finalized);
+    let finalized = wallet.sign(&mut psbt, SignOptions::default()).unwrap();
+    assert!(finalized, "Tx has not been finalized");
+
+    let raw_transaction = psbt.extract_tx();
+
+    let txid = raw_transaction.txid();
+    blockchain.broadcast(&raw_transaction).unwrap();
+
+    println!(
+        "Transaction sent! TXID: {txid}.\nExplorer URL: https://blockstream.info/testnet/tx/{txid}",
+        txid = txid
+    );
+    
     Ok(Json(tx_details))
 }
 
