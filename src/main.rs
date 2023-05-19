@@ -22,6 +22,7 @@ use bdk::{
     SyncOptions,
     SignOptions,
     TransactionDetails,
+    FeeRate,
 };
 
 use std::str::FromStr;
@@ -44,12 +45,35 @@ fn create_wallet() -> Wallet<MemoryDatabase>{
 struct Withdraw {
     amount: u64,
     address: String,
+    fee_rate: f32,
 }
 
 #[get("/address")]
 fn address() -> String {
     let wallet = create_wallet();
     return wallet.get_address(AddressIndex::Peek(10)).unwrap().to_string();
+}
+
+#[get("/transactiondetails?<address>&<amount>&<fee_rate>")]
+fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Json<TransactionDetails>, Status> {
+    let wallet = create_wallet();
+
+    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+    let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
+    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+
+    let faucet_address = Address::from_str(&address).unwrap();
+
+    let mut tx_builder = wallet.build_tx();
+    
+    tx_builder
+        .add_recipient(faucet_address.script_pubkey(), amount)
+        .fee_rate(FeeRate::from_sat_per_vb(fee_rate))
+        .enable_rbf();
+
+    let ( _, tx_details) = tx_builder.finish().unwrap();
+
+    Ok(Json(tx_details))
 }
 
 // #[get("/balance")]
@@ -65,9 +89,11 @@ fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status
     let faucet_address = Address::from_str(&withdraw.address).unwrap();
 
     let mut tx_builder = wallet.build_tx();
-        
+    
+    // TODO: handle error for failed transaction
     tx_builder
         .add_recipient(faucet_address.script_pubkey(), withdraw.amount)
+        .fee_rate(FeeRate::from_sat_per_vb(withdraw.fee_rate))
         .enable_rbf();
         
     let (mut psbt, tx_details) = tx_builder.finish().unwrap();
@@ -115,5 +141,5 @@ impl Fairing for Cors {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().attach(Cors).mount("/", routes![index, address, withdraw])
+    rocket::build().attach(Cors).mount("/", routes![index, address, withdraw, transaction_details])
 }
