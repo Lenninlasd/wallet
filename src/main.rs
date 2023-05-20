@@ -8,10 +8,17 @@ use rocket::http::Header;
 
 use bdk::{
     Wallet,
+    Balance,
     bitcoin::{
         Network,
         Address,
     },
+    keys::{
+        DerivableKey,
+        ExtendedKey,
+        bip39::Mnemonic
+    },
+    template::Bip84,
     database::MemoryDatabase,
     wallet::AddressIndex,
     blockchain::{
@@ -23,22 +30,43 @@ use bdk::{
     SignOptions,
     TransactionDetails,
     FeeRate,
+    KeychainKind,
 };
 
-use std::str::FromStr;
+use std::{
+    str::FromStr,
+    env,
+};
 
-fn create_wallet() -> Wallet<MemoryDatabase>{
-    let external_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/0'/0'/0/*)";
-    let internal_descriptor = "wpkh(tprv8ZgxMBicQKsPdy6LMhUtFHAgpocR8GC6QmwMSFpZs7h6Eziw3SpThFfczTDh5rW2krkqffa11UpX3XkeTTB2FvzZKWXqPY54Y6Rq4AQ5R8L/84'/0'/0'/1/*)";
+fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
+    let  network = Network::Testnet;
+
+    let mnemonic_words = match env::var("MNEMONIC_WORDS") {
+        Ok(value) => value,
+        Err(_) => return Err("Error: MNEMONIC NOT SET".to_string()),
+    };
+
+    // Parse a mnemonic
+    let mnemonic  = Mnemonic::parse(&mnemonic_words).unwrap();
+    // Generate the extended key
+    let xkey: ExtendedKey = mnemonic.into_extended_key().unwrap();
+    // Get xprv from the extended key
+    let xprv = xkey.into_xprv(network).unwrap();
 
     let wallet = Wallet::new(
-        external_descriptor,
-        Some(internal_descriptor),
-        Network::Testnet,
+        Bip84(xprv, KeychainKind::External),
+        Some(Bip84(xprv, KeychainKind::Internal)),
+        network,
         MemoryDatabase::new(),
     ).unwrap();
 
-    return wallet;
+    return Ok(wallet);
+}
+
+fn sync_wallet(wallet: &Wallet<MemoryDatabase>) {
+    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+    let blockchain = ElectrumBlockchain::from(client);
+    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,13 +78,28 @@ struct Withdraw {
 
 #[get("/address")]
 fn address() -> String {
-    let wallet = create_wallet();
+    let wallet = create_wallet().unwrap();
     return wallet.get_address(AddressIndex::Peek(10)).unwrap().to_string();
+}
+
+#[get("/balance")]
+fn balance() -> Result<Json<Balance>, Status> {
+    let wallet = create_wallet().unwrap();
+    sync_wallet(&wallet);
+
+    // let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+    // let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
+    // wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+
+    let balance = wallet.get_balance().unwrap();
+    println!("Wallet balance in SAT: {}", balance);
+    
+    Ok(Json(balance))
 }
 
 #[get("/transactiondetails?<address>&<amount>&<fee_rate>")]
 fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Json<TransactionDetails>, Status> {
-    let wallet = create_wallet();
+    let wallet = create_wallet().unwrap();
 
     let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
     let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
@@ -79,7 +122,7 @@ fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Js
 // #[get("/balance")]
 #[post("/withdraw", format = "json", data = "<withdraw>")]
 fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status> {
-    let wallet = create_wallet();
+    let wallet = create_wallet().unwrap();
 
     let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
     let blockchain = ElectrumBlockchain::from(client);
@@ -141,5 +184,5 @@ impl Fairing for Cors {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().attach(Cors).mount("/", routes![index, address, withdraw, transaction_details])
+    rocket::build().attach(Cors).mount("/", routes![index, address, withdraw, transaction_details, balance])
 }
