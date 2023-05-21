@@ -8,6 +8,7 @@ use rocket::http::Header;
 
 use bdk::{
     Wallet,
+    wallet::get_funded_wallet,
     Balance,
     bitcoin::{
         Network,
@@ -38,6 +39,10 @@ use std::{
     env,
 };
 
+fn get_test_wpkh() -> &'static str {
+    "wpkh(cVpPVruEDdmutPzisEsYvtST1usBR3ntr8pXSyt6D2YYqXRyPcFW)"
+}
+
 fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
     let  network = Network::Testnet;
 
@@ -63,10 +68,11 @@ fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
     return Ok(wallet);
 }
 
-fn sync_wallet(wallet: &Wallet<MemoryDatabase>) {
+fn sync_wallet(wallet: &Wallet<MemoryDatabase>) -> ElectrumBlockchain {
     let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
     let blockchain = ElectrumBlockchain::from(client);
     wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+    return blockchain;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -87,10 +93,6 @@ fn balance() -> Result<Json<Balance>, Status> {
     let wallet = create_wallet().unwrap();
     sync_wallet(&wallet);
 
-    // let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
-    // let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
-    // wallet.sync(&blockchain, SyncOptions::default()).unwrap();
-
     let balance = wallet.get_balance().unwrap();
     println!("Wallet balance in SAT: {}", balance);
     
@@ -98,12 +100,8 @@ fn balance() -> Result<Json<Balance>, Status> {
 }
 
 #[get("/transactiondetails?<address>&<amount>&<fee_rate>")]
-fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Json<TransactionDetails>, Status> {
-    let wallet = create_wallet().unwrap();
-
-    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
-    let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
-    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Json<TransactionDetails>, Status> {    
+    let (wallet, _, _) = get_funded_wallet(get_test_wpkh());
 
     let faucet_address = Address::from_str(&address).unwrap();
 
@@ -123,10 +121,7 @@ fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Js
 #[post("/withdraw", format = "json", data = "<withdraw>")]
 fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status> {
     let wallet = create_wallet().unwrap();
-
-    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
-    let blockchain = ElectrumBlockchain::from(client);
-    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
+    let  blockchain = sync_wallet(&wallet);
 
     // mv4rnyY3Su5gjcDNzbMLKBQkBicCtHUtFB
     let faucet_address = Address::from_str(&withdraw.address).unwrap();
