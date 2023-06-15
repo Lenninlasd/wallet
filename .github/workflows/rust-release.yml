@@ -1,0 +1,34 @@
+name: Rust
+
+on:
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: Login to Docker
+      run: doctl registry login
+
+    - name: Build Image
+      run: docker build . -t registry.digitalocean.com/zener/engine:wallet-${{ github.event.release.tag_name }}
+
+    - name: Push Image
+      run: docker push registry.digitalocean.com/zener/engine:wallet-${{ github.event.release.tag_name }}
