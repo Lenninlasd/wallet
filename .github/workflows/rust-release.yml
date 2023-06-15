@@ -25,7 +25,7 @@ jobs:
         token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
 
     - name: Login to Docker
-      run: doctl registry login
+      run: doctl registry login --expiry-seconds 90
 
     - name: Build Image
       run: docker build . -t registry.digitalocean.com/zener/engine:wallet-${{ github.event.release.tag_name }}
