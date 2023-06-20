@@ -1,4 +1,4 @@
-name: Rust
+name: Rust Build and Deploy on Realese
 
 on:
   release:
@@ -32,3 +32,30 @@ jobs:
 
     - name: Push Image
       run: docker push registry.digitalocean.com/zener/engine:wallet-${{ github.event.release.tag_name }}
+  
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy Wallet
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{secrets.SSH_HOST}}
+          key: ${{secrets.SSH_KEY}}
+          username: ${{ secrets.SSH_USERNAME }}
+          script: |
+            docker pull registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}
+            echo "Stopping and removing the existing wallet container..."
+            docker stop wallet
+            docker rm wallet
+
+            docker run -d \
+              --name wallet \
+              --network zener_mynetwork \
+              -p 8000:8000 \
+              -e MNEMONIC_WORDS=${{ secrets.TEST_MNEMONIC_WORDS }} \
+              registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}
