@@ -62,5 +62,5 @@ jobs:
               --name wallet \
               --network zener_mynetwork \
               -p 8000:8000 \
-              -e MNEMONIC_WORDS=${{ secrets.TEST_MNEMONIC_WORDS }} \
+              -e MNEMONIC_WORDS='${{ secrets.TEST_MNEMONIC_WORDS }}' \
               registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}
