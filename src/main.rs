@@ -1,10 +1,10 @@
 #[macro_use] extern crate rocket;
 use rocket::{get, http::Status, serde::json::Json};
 use serde::{Serialize, Deserialize};
-
 use rocket::{Request, Response};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
+use sha256::digest;
 
 use bdk::{
     Wallet,
@@ -77,9 +77,11 @@ fn sync_wallet(wallet: &Wallet<MemoryDatabase>) -> ElectrumBlockchain {
 
 #[derive(Serialize, Deserialize)]
 struct Withdraw {
+    reference: String,
     amount: u64,
     address: String,
     fee_rate: f32,
+    checksum: String,
 }
 
 #[get("/address")]
@@ -120,6 +122,15 @@ fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Js
 // #[get("/balance")]
 #[post("/withdraw", format = "json", data = "<withdraw>")]
 fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status> {
+    let integrity = env::var("WITHDRAWAL_INTEGRITY").unwrap_or_else(|_| String::new());
+    let str_token = format!("{}{}{}{}{}", withdraw.reference, withdraw.fee_rate, withdraw.amount, withdraw.address, integrity);
+    let checksum = digest(str_token);
+    
+    println!("checksum: {checksum}");
+    if checksum != withdraw.checksum {
+        return Err(Status::BadRequest);
+    }
+
     let wallet = create_wallet().unwrap();
     let  blockchain = sync_wallet(&wallet);
 
