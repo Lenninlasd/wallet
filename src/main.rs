@@ -125,9 +125,9 @@ fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status
     let integrity = env::var("WITHDRAWAL_INTEGRITY").unwrap_or_else(|_| String::new());
     let str_token = format!("{}{}{}{}{}", withdraw.reference, withdraw.fee_rate, withdraw.amount, withdraw.address, integrity);
     let checksum = digest(str_token);
-    
-    println!("checksum: {checksum}");
+
     if checksum != withdraw.checksum {
+        println!("Wrong checksum");
         return Err(Status::BadRequest);
     }
 
