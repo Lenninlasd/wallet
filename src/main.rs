@@ -75,6 +75,13 @@ fn sync_wallet(wallet: &Wallet<MemoryDatabase>) -> ElectrumBlockchain {
     return blockchain;
 }
 
+fn check_integrity(withdraw: &Json<Withdraw>) -> bool {
+    let integrity = env::var("WITHDRAWAL_INTEGRITY").unwrap_or_else(|_| String::new());
+    let str_token = format!("{}{}{}{}{}", withdraw.reference, withdraw.fee_rate, withdraw.amount, withdraw.address, integrity);
+    let checksum = digest(str_token);
+    return checksum == withdraw.checksum;
+}
+
 #[derive(Serialize, Deserialize)]
 struct Withdraw {
     reference: String,
@@ -122,11 +129,8 @@ fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Js
 // #[get("/balance")]
 #[post("/withdraw", format = "json", data = "<withdraw>")]
 fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status> {
-    let integrity = env::var("WITHDRAWAL_INTEGRITY").unwrap_or_else(|_| String::new());
-    let str_token = format!("{}{}{}{}{}", withdraw.reference, withdraw.fee_rate, withdraw.amount, withdraw.address, integrity);
-    let checksum = digest(str_token);
-
-    if checksum != withdraw.checksum {
+    let is_checksum_valid = check_integrity(&withdraw);
+    if !is_checksum_valid {
         println!("Wrong checksum");
         return Err(Status::BadRequest);
     }
