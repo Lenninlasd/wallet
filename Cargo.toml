@@ -9,3 +9,4 @@ regex = "0.1.41"
 bdk = {version = "0.28.0", features = ["keys-bip39"]}
 rocket = {version = "0.5.0-rc.2", features = ["json"]}
 serde = "1.0.152"
+sha256 = "1.2.2"
