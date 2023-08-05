@@ -2,6 +2,7 @@
 use rocket::{get, http::Status, serde::json::Json};
 use serde::{Serialize, Deserialize};
 use rocket::{Request, Response};
+use rocket::response::status::Custom;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
 use sha256::digest;
@@ -32,6 +33,7 @@ use bdk::{
     TransactionDetails,
     FeeRate,
     KeychainKind,
+    Error,
 };
 
 use std::{
@@ -97,6 +99,13 @@ fn address() -> String {
     return wallet.get_address(AddressIndex::Peek(10)).unwrap().to_string();
 }
 
+#[derive(Serialize)]
+pub struct GenericResponse {
+    pub status: String,
+    pub message: String,
+    pub error: String,
+}
+
 #[get("/balance")]
 fn balance() -> Result<Json<Balance>, Status> {
     let wallet = create_wallet().unwrap();
@@ -126,13 +135,16 @@ fn transaction_details(address: String, amount: u64, fee_rate: f32) -> Result<Js
     Ok(Json(tx_details))
 }
 
-// #[get("/balance")]
 #[post("/withdraw", format = "json", data = "<withdraw>")]
-fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status> {
+fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Custom<Json<GenericResponse>>> {
     let is_checksum_valid = check_integrity(&withdraw);
     if !is_checksum_valid {
-        println!("Wrong checksum");
-        return Err(Status::BadRequest);
+        let error_response = GenericResponse {
+            status: "fail".to_string(),
+            message: "Wrong checksum".to_string(),
+            error: "WrongChecksum".to_string(),
+        };
+        return Err(Custom(Status::BadRequest, Json(error_response)));
     }
 
     let wallet = create_wallet().unwrap();
@@ -148,8 +160,32 @@ fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Status
         .add_recipient(faucet_address.script_pubkey(), withdraw.amount)
         .fee_rate(FeeRate::from_sat_per_vb(withdraw.fee_rate))
         .enable_rbf();
-        
-    let (mut psbt, tx_details) = tx_builder.finish().unwrap();
+
+    let (mut psbt, tx_details) = match tx_builder.finish() {
+        Ok(tx_builder_result) => {
+            tx_builder_result
+        }
+        Err(error) => {
+            let error_response = match error {
+                Error::InsufficientFunds { needed: _, available: _ } => {
+                    GenericResponse {
+                        status: "fail".to_string(),
+                        message: format!("{}",error),
+                        error: "InsufficientFunds".to_string(),
+                    }
+                }
+                rest_error => {
+                    GenericResponse {
+                        status: "fail".to_string(),
+                        message: rest_error.to_string(),
+                        error: "Generic".to_string(),
+                    }
+                }
+            };
+
+            return Err(Custom(Status::InternalServerError, Json(error_response)));
+        }
+    };
     
     println!("Transaction details: {:#?}", tx_details);
 
