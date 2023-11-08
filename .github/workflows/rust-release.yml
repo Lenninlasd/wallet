@@ -50,18 +50,18 @@ jobs:
           script: |
             docker pull registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}
 
-            if [ "$(docker ps -aq -f name=wallet)" ]; then
-              echo "Stopping and removing the existing wallet container..."
-              docker stop wallet
-              docker rm wallet
+            if [ "$(docker ps -aq -f name=wallet_prod)" ]; then
+              echo "Stopping and removing the existing wallet_prod container..."
+              docker stop wallet_prod
+              docker rm wallet_prod
             else
               echo "No running wallet container found."
             fi
 
             docker run -d \
-              --name wallet \
-              --network zener_mynetwork \
-              -p 8000:8000 \
-              -e MNEMONIC_WORDS='${{ secrets.TEST_MNEMONIC_WORDS }}' \
+              --name wallet_prod \
+              --network zener_prodnetwork \
+              -p 8002:8002 \
+              -e MNEMONIC_WORDS='${{ secrets.MNEMONIC_WORDS }}' \
               -e WITHDRAWAL_INTEGRITY=${{ secrets.WITHDRAWAL_INTEGRITY }} \
               registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}

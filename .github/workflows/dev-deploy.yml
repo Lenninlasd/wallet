@@ -1,0 +1,65 @@
+name: Rust Build and Deploy on Realese
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose
+
+    - name: Install doctl
+      uses: digitalocean/action-doctl@v2
+      with:
+        token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+    - name: Login to Docker
+      run: doctl registry login --expiry-seconds 900
+
+    - name: Build Image
+      run: docker build . -t registry.digitalocean.com/zener/engine:wallet-dev
+
+    - name: Push Image
+      run: docker push registry.digitalocean.com/zener/engine:wallet-dev
+  
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy Wallet
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{secrets.SSH_HOST}}
+          key: ${{secrets.SSH_KEY}}
+          username: ${{ secrets.SSH_USERNAME }}
+          script: |
+            docker pull registry.digitalocean.com/zener/engine:wallet-dev
+
+            if [ "$(docker ps -aq -f name=wallet)" ]; then
+              echo "Stopping and removing the existing wallet container..."
+              docker stop wallet
+              docker rm wallet
+            else
+              echo "No running wallet container found."
+            fi
+
+            docker run -d \
+              --name wallet \
+              --network zener_mynetwork \
+              -p 8000:8000 \
+              -e MNEMONIC_WORDS='${{ secrets.TEST_MNEMONIC_WORDS }}' \
+              -e WITHDRAWAL_INTEGRITY=${{ secrets.TEST_WITHDRAWAL_INTEGRITY }} \
+              registry.digitalocean.com/zener/engine:wallet-dev
