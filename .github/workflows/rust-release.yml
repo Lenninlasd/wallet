@@ -60,7 +60,7 @@ jobs:
 
             docker run -d \
               --name wallet_prod \
-              --network zener_prodnetwork \
+              --network zener_mynetwork \
               -p 8002:8002 \
               -e MNEMONIC_WORDS='${{ secrets.MNEMONIC_WORDS }}' \
               -e WITHDRAWAL_INTEGRITY=${{ secrets.WITHDRAWAL_INTEGRITY }} \
