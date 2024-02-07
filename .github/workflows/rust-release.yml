@@ -64,4 +64,5 @@ jobs:
               -p 8002:8002 \
               -e MNEMONIC_WORDS='${{ secrets.MNEMONIC_WORDS }}' \
               -e WITHDRAWAL_INTEGRITY=${{ secrets.WITHDRAWAL_INTEGRITY }} \
+              -e ENVIRONMENT=prod \
               registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}
