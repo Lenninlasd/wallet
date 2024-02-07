@@ -15,7 +15,7 @@ use std::env;
 pub fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
     let mut network = Network::Testnet;
 
-    if let Ok(environment) = env::var("ENVIRONMENT") {
+    if let Ok(environment) = env::var("BITCOIN_NETWORK") {
         if environment == "Mainnet" {
             network = Network::Bitcoin;
         }
