@@ -16,7 +16,7 @@ pub fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
     let mut network = Network::Testnet;
 
     if let Ok(environment) = env::var("ENVIRONMENT") {
-        if environment == "prod" {
+        if environment == "Mainnet" {
             network = Network::Bitcoin;
         }
     }
