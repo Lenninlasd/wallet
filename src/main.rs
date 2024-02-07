@@ -1,3 +1,5 @@
+mod wallet;
+
 #[macro_use] extern crate rocket;
 use rocket::{get, http::Status, serde::json::Json};
 use serde::{Serialize, Deserialize};
@@ -8,31 +10,14 @@ use rocket::http::Header;
 use sha256::digest;
 
 use bdk::{
-    Wallet,
     wallet::get_funded_wallet,
     Balance,
-    bitcoin::{
-        Network,
-        Address,
-    },
-    keys::{
-        DerivableKey,
-        ExtendedKey,
-        bip39::Mnemonic
-    },
-    template::Bip84,
-    database::MemoryDatabase,
+    bitcoin::Address,
     wallet::AddressIndex,
-    blockchain::{
-        ElectrumBlockchain,
-        Blockchain,
-    },
-    electrum_client::Client,
-    SyncOptions,
+    blockchain::Blockchain,
     SignOptions,
     TransactionDetails,
     FeeRate,
-    KeychainKind,
     Error,
 };
 
@@ -41,40 +26,15 @@ use std::{
     env,
 };
 
+use wallet::{
+    create_wallet,
+    sync_wallet,
+    generate_mnemonic,
+    extended_pub_key,
+};
+
 fn get_test_wpkh() -> &'static str {
     "wpkh(cVpPVruEDdmutPzisEsYvtST1usBR3ntr8pXSyt6D2YYqXRyPcFW)"
-}
-
-fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
-    let  network = Network::Testnet;
-
-    let mnemonic_words = match env::var("MNEMONIC_WORDS") {
-        Ok(value) => value,
-        Err(_) => return Err("Error: MNEMONIC NOT SET".to_string()),
-    };
-
-    // Parse a mnemonic
-    let mnemonic  = Mnemonic::parse(&mnemonic_words).unwrap();
-    // Generate the extended key
-    let xkey: ExtendedKey = mnemonic.into_extended_key().unwrap();
-    // Get xprv from the extended key
-    let xprv = xkey.into_xprv(network).unwrap();
-
-    let wallet = Wallet::new(
-        Bip84(xprv, KeychainKind::External),
-        Some(Bip84(xprv, KeychainKind::Internal)),
-        network,
-        MemoryDatabase::new(),
-    ).unwrap();
-
-    return Ok(wallet);
-}
-
-fn sync_wallet(wallet: &Wallet<MemoryDatabase>) -> ElectrumBlockchain {
-    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
-    let blockchain = ElectrumBlockchain::from(client);
-    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
-    return blockchain;
 }
 
 fn check_integrity(withdraw: &Json<Withdraw>) -> bool {
@@ -97,6 +57,16 @@ struct Withdraw {
 fn address() -> String {
     let wallet = create_wallet().unwrap();
     return wallet.get_address(AddressIndex::Peek(10)).unwrap().to_string();
+}
+
+#[get("/rand_mnemonic")]
+fn mnemonic() -> String {
+    return generate_mnemonic();
+}
+
+#[get("/extended")]
+fn extended() -> String {
+    return extended_pub_key();
 }
 
 #[derive(Serialize)]
@@ -230,5 +200,5 @@ impl Fairing for Cors {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().attach(Cors).mount("/", routes![index, address, withdraw, transaction_details, balance])
+    rocket::build().attach(Cors).mount("/", routes![index, address, withdraw, transaction_details, balance, mnemonic, extended])
 }

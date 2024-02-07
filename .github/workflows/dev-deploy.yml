@@ -62,4 +62,5 @@ jobs:
               -p 8000:8000 \
               -e MNEMONIC_WORDS='${{ secrets.TEST_MNEMONIC_WORDS }}' \
               -e WITHDRAWAL_INTEGRITY=${{ secrets.TEST_WITHDRAWAL_INTEGRITY }} \
+              -e BITCOIN_NETWORK=Testnet \
               registry.digitalocean.com/zener/engine:wallet-dev
