@@ -15,8 +15,8 @@ use std::env;
 pub fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
     let mut network = Network::Testnet;
 
-    if let Ok(environment) = env::var("ENVIRONMENT") {
-        if environment == "Mainnet" {
+    if let Ok(bitcoin_network) = env::var("BITCOIN_NETWORK") {
+        if bitcoin_network == "Mainnet" {
             network = Network::Bitcoin;
         }
     }
@@ -46,7 +46,14 @@ pub fn create_wallet() -> Result<Wallet<MemoryDatabase>, String> {
 }
 
 pub fn sync_wallet(wallet: &Wallet<MemoryDatabase>) -> ElectrumBlockchain {
-    let client = Client::new("ssl://electrum.blockstream.info:60002").unwrap();
+    let mut client_url = "ssl://electrum.blockstream.info:60002";
+    if let Ok(bitcoin_network) = env::var("BITCOIN_NETWORK") {
+        if bitcoin_network == "Mainnet" {
+            // https://1209k.com/bitcoin-eye/ele.php?chain=btc
+            client_url = "ssl://electrum.blockstream.info:50002";
+        }
+    }
+    let client = Client::new(client_url).unwrap();
     let blockchain = ElectrumBlockchain::from(client);
     wallet.sync(&blockchain, SyncOptions::default()).unwrap();
     return blockchain;
