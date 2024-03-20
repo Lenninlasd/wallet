@@ -125,7 +125,6 @@ fn withdraw(withdraw: Json<Withdraw>) -> Result<Json<TransactionDetails>, Custom
 
     let mut tx_builder = wallet.build_tx();
     
-    // TODO: handle error for failed transaction
     tx_builder
         .add_recipient(faucet_address.script_pubkey(), withdraw.amount)
         .fee_rate(FeeRate::from_sat_per_vb(withdraw.fee_rate))
