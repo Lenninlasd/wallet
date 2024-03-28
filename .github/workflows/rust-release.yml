@@ -50,7 +50,7 @@ jobs:
           script: |
             docker pull registry.digitalocean.com/zener/engine:wallet-${{ env.TAG_NAME }}
 
-            if [ "$(docker ps -aq -f name=wallet_prod)" ]; then
+            if [ "$(docker ps -aq --filter 'name=^/wallet_prod$')" ]; then
               echo "Stopping and removing the existing wallet_prod container..."
               docker stop wallet_prod
               docker rm wallet_prod
