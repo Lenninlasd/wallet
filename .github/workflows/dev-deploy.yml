@@ -28,10 +28,10 @@ jobs:
       run: doctl registry login --expiry-seconds 900
 
     - name: Build Image
-      run: docker build . -t registry.digitalocean.com/zener/engine:wallet-dev
+      run: docker build . -t registry.digitalocean.com/zener/engine:wallet-dev-${{ github.sha }}
 
     - name: Push Image
-      run: docker push registry.digitalocean.com/zener/engine:wallet-dev
+      run: docker push registry.digitalocean.com/zener/engine:wallet-dev-${{ github.sha }}
   
   deploy:
     runs-on: ubuntu-latest
@@ -46,9 +46,9 @@ jobs:
           key: ${{secrets.SSH_KEY}}
           username: ${{ secrets.SSH_USERNAME }}
           script: |
-            docker pull registry.digitalocean.com/zener/engine:wallet-dev
+            docker pull registry.digitalocean.com/zener/engine:wallet-dev-${{ github.sha }}
 
-            if [ "$(docker ps -aq -f name=wallet)" ]; then
+            if [ "$(docker ps -aq --filter 'name=^/wallet$')" ]; then
               echo "Stopping and removing the existing wallet container..."
               docker stop wallet
               docker rm wallet
@@ -63,4 +63,4 @@ jobs:
               -e MNEMONIC_WORDS='${{ secrets.TEST_MNEMONIC_WORDS }}' \
               -e WITHDRAWAL_INTEGRITY=${{ secrets.TEST_WITHDRAWAL_INTEGRITY }} \
               -e BITCOIN_NETWORK=Testnet \
-              registry.digitalocean.com/zener/engine:wallet-dev
+              registry.digitalocean.com/zener/engine:wallet-dev-${{ github.sha }}
