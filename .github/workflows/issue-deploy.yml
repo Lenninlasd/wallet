@@ -25,7 +25,7 @@ jobs:
           ISSUE_BODY="${{ github.event.issue.body }}"
 
           if [ "${{ github.event_name }}" == "issue_comment" ]; then
-            ISSUE_BODY="${{ github.event.issue_comment.body }}"
+            ISSUE_BODY="${{ github.event.comment.body }}"
           fi
 
           ENV=$(echo "$ISSUE_BODY" | grep -o -- '--env [^ ]*' | cut -d' ' -f2)
@@ -43,6 +43,7 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     needs: [extract-context]
+    if: needs.extract-context.outputs.environment == 'prod'
     env:
       ENV: ${{needs.extract-context.outputs.environment}}
       TAG: ${{needs.extract-context.outputs.tag_img}}
@@ -73,10 +74,11 @@ jobs:
               -e MNEMONIC_WORDS='${{ secrets.MNEMONIC_WORDS }}' \
               -e WITHDRAWAL_INTEGRITY=${{ secrets.WITHDRAWAL_INTEGRITY }} \
               -e BITCOIN_NETWORK=Mainnet \
-              registry.digitalocean.com/zener/engine:${{ env.TAG_NAME }}
+              registry.digitalocean.com/zener/engine:${{ env.TAG }}
   deploy-dev:
     runs-on: ubuntu-latest
     needs: [extract-context]
+    if: needs.extract-context.outputs.environment == 'dev'
     env:
       ENV: ${{needs.extract-context.outputs.environment}}
       TAG: ${{needs.extract-context.outputs.tag_img}}
