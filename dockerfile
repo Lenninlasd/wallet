@@ -1,4 +1,4 @@
-FROM rust:1.70.0-bullseye as builder
+FROM rust:1.82.0-bullseye as builder
 WORKDIR /app
 COPY . .
 RUN cargo install --path .
